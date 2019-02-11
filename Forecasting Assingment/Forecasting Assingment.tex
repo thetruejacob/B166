@@ -1,51 +1,65 @@
- \documentclass{article} 
- \usepackage[left=3cm, right=3cm, top=3cm]{geometry} 
- \usepackage{graphicx}
+\documentclass{article} 
+\usepackage[left=3cm, right=3cm, top=3cm]{geometry} 
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{hyperref}
+
+\setlength\parindent{0pt}
+
  \begin{document}
 
+\begin{abstract}
+	Carbon dioxide is a major greenhouse gas that leads to a near-irreversible warming of the atmosphere. Specifically, CO2 levels are at their highest in 800,000 years. In this paper, I explore the current trend in the rise of atmospheric CO2, and link them to possible business insights. 
+\end{abstract}
+
 \section*{The Dataset}
-We are using the monthly mean Co2 ppm from Mauna Loa. This dataset
-\begin{center}
-\includegraphics[scale = 0.5]{recent.jpg}
-\end{center}
-
-\section*{Analysis}
-We explore the dataset using triple exponential smoothing, ARIMA, and using Gaussian Processes. 
-\subsection*{}
+The dataset of choice is series of atmospheric carbon dioxide measurements stretching back from March 1953. I chose this dataset because of its completeness (there were only 5 NAs in over 700 measurements), clear patterns of seasonality and trends, and significance. This graph, known otherwise as the Keeling Curve, first alerted the world to the possibility of human contribution to global warming.\\
 
 
-\begin{verbatim}
-df = read.table("Downloads/co2_mm_mlo.txt")
-names(df) = c("Year", "Month", "Date", "average", "interpolated", "trend", "days")
-df$Dates = as.Date(paste(df$Year, df$Month, 1, sep = "-"), format = "%Y-%m-%d")
-plot(df[,8], df[,5], type = "l", xlab = "Year", ylab = "Yearly Average", 
-     main = "Mauna Loa Yearly Carbon Dioxide Concentration")
-plot(1958:2018, tapply(df[,5], format(df[,8], "%Y"), mean), xlab = "Year", 
-     ylab = "Yearly Average", main = "Mean Annual CO2 Levels", type = "l")
-plot(df[647:718, 8], df[647:718, 4], type = "o", xlab = "Years", 
-     ylab = "Average CO2 Level (ppm)", main = "Recent Monthly Mean CO2 Levels")
-    
-library(stats, forecast)
-shortts = ts(df[647:718, 4], frequency = 12, start = c(2012, 1))
-plot(HoltWinters(shortts))
-MAPE(HoltWinters(shortts)$fitted[,1], df[659:718, 4])
+\begin{figure*}[h]
+\includegraphics[width = 8cm, height = 8cm]{recent.jpg}
+\includegraphics[width = 8cm, height = 8cm]{entire.png}
+\caption{The Mauna Loa Dataset shows clear patterns of both trend and seasonality. The former is largely a result of human-caused fossil fuel burning, at a rate of approximately 1 ppm/yr, although in the last decade the rate of growth has itself increased to at least 1.5 ppm/yr. There is a seasonal variation of approximately 5ppm in each year, with a maximum in May and a minimum in September - corresponding to carbon dioxide absorption through photosynthesis, and a subsequent release as plants die in the fall. }
+\end{figure*}
 
-fullts = ts(df[1:718,5], frequency = 12, start = c(1958, 3))
-plot(HoltWinters(fullts))
-MAPE(HoltWinters(fullts)$fitted[,1], df[13:718,5])
+\section*{Statistical Analysis}
+We explore the dataset using Holt-Winters (Triple Exponential) Smoothing, and with SARIMA\footnote{\#forecasts: Using Holt-Winters and ARIMA in R. I had to research this myself. It wasn't easy.}. Predictions using both methods are similar, also Holt-Winters seemed to have a slight edge, despite SARIMA models having the capacity to include lag effects in the temperature. Both statistical models were much more sophisticated than previous models encountered in class, including the Gompertz curve (which cannot account for seasonality), and simple Moving Averages (which cannot account for trends).\footnote{\#algorithms: I chose to research how to implement SARIMA so that Holt-Winters would have a fair comparison. Although I had to compare it to averages and Gompertz curve, I believe SARIMA was most appropriate for the job because it included a lag term - as shown in the appendix.}\footnote{\dataviz#: I decided that the clearest way to visually compare the two forecasting methods was to plot them on the same graph, where I could display the current dataset, the test set, the prediction set, and the two confidence intervals.}
 
-pred = data.frame(predict(stats::HoltWinters(fullts), 
-                                n.ahead = 8, prediction.interval = 1))
-pred$date = seq(as.Date("2018-01-01"), by = "month", length.out = 8)
+\begin{figure*}[h]
+	\includegraphics[width = 8cm, height = 8cm]{decomposition.jpg}
+	\includegraphics[width = 8cm, height = 8cm]{totalconfint.png}
+	\caption{Left: The mauna loa dataset can be clearly decomposed into the trend, the seasonal component, and a random component. Right: Both the Holt-Winters method and SARIMA were very accurate in their predictions of global temperature trends. When using the full dataset from 1953 to 2017 as training data, and using measurements during the months of 2018 as testing data. The confidence intervals for SARIMA are very slightly wider than those of Holt-Winters, indicating marginally greater uncertainty. This is confirmed by MAPE against the test set, which is 0.0007 for Holt-Winters, and 0.0009 for SARIMA.}
+\end{figure*}
 
-plot(pred[,4], pred[,1], type = "o", main = "Predicted 2018 CO2 Levels",
-     xlab = "Month of 2018", ylab = "Co2 Levels (ppm)", ylim = c(405, 414))
+\section*{Further Augmentation}
+It is possible to augment the process in order to obtain even more accurate estimates both quantitatively and qualitatively. First and foremost, instead of calculating mean monthly estimates of CO2, we could employ weekly estimates, rather than monthly estimates for more marginally more accurate understanding of the seasonality throughout the year. Furthermore, we could have blended some other statistical methods. Beyond ARIMA, Holt-Winters and the Theta method, we could experiment with machine learning methods, such as Recurrent neural networks (RNN), support vector regression (SVR), or Gaussian Process Regression. For qualitative augmentation, experts could be brought in to help understand the rate of growth of CO2-heavy industries around the world. One of the uncertainties in the model, for exampl,e is the linear trend of growth which seems to accelerate exponentially, the effects of which may accelerate in the 21st century as developing countries enter stages of industrial growth, or decelerate as developed countries shift to clean energy. 
 
-with(pred, polygon(c(date, rev(date)), c(lwr, rev(upr)), col = "grey", border = 1))
-matlines(pred[,4], pred[,-4], lwd = c(2,1,1), lty = c(1,2,2),)
-MAPE(forecasted[,1], df[718:725,5])
+\section*{Business Insights}
+The rapid growth in atmospheric CO2 is alarming and seems to only be increasing at an exponential rate. A change as profound as CO2, correlated with the warming of the Earth, will massive disrupt large numbers of industries worldwide, yet at the same time hold opportunities for business ventures. Evidently, businesses involving carbon dioxide removal, whereby atmospheric CO2 is directly captured from the air and converted into fuel, is soon becoming a possibility. New technologies will allow a new conceptualization of CO2 not as a waste but a resource, one cheaply and easily obtained, into acetic acid (made from CO2 and methane, another greenhouse gas), ethanol, and plastics normally created from petroleum are now possibilities for a budding industry which can not only be lucrative, but where conversion from Carbon dioxide into renewable products becomes a social good.\footnote{\#dataDrivenEnterprise: I identified a possible growth in carbon-dioxide based industries, based not only on the introduction of a new, cheaply acquired commodity into the economy (CO2), but also the social good/obligation expected from industries to make use out of waste material.}
 
-\end{verbatim}
+\section*{References}
+Turning CO2 into a Valuable Resource. (n.d.). Retrieved from https://news.cnrs.fr/articles/turning-co2-into-a-valuable-resource\\
+
+From CO2 to Ethanol: Efficient and Renewable Energy. (2018, June 22). Retrieved from https://www. conservationinstitute.org/co2-to-ethanol/\\
+
+Dennin, J. (2018, September 18). After 150 Years, We Finally Had a Breakthrough Toward Turning CO2 Into Fuel. Retrieved from https://www.inverse.com/article/49033-after-150-years-we-finally-had-a-breakthrough-toward-turning-co2-into-fuel \\
+
+Carbon dioxide as a raw material. (2018, April 17). Retrieved from https://www.sciencedaily.com/releases/ 2018/04/180417115711.htm\\
+
+Seeing carbon dioxide as a raw material rather than a waste product could lead to a more sustainable future. (n.d.). Retrieved from https://phys.org/news/2016-02-carbon-dioxide-raw-material-product.html\\
+
+O'Dowd, E. (n.d.). How is CO2 being used as a raw material for plastics? Retrieved from https://www.bio basedworldnews.com/how-is-co2-being-used-as-a-raw-material-for-plastics\\
+
+(n.d.). Retrieved from https://www.co2-dreams.covestro.com/en\\
+
+Sweet, C. (2018, April 27). 5 surprising products companies are making from carbon dioxide. Retrieved from https://www.greenbiz.com/article/5-surprising-products-companies-are-making-carbon-dioxide
+
+\section*{Appendix}
+All code for the assignment can be found \href{https://github.com/thetruejacob/B166/blob/master/Forecasting%20Assingment/HoltWinters%20and%20ARIMA.ipynb}{here}.
+ \footnote{\#professionalism: I uploaded the file to GitHub - specifically an iRkernel notebook so you can clearly see and replicate my code.}
+
+
+
 
 
 \end{document}
